@@ -2,6 +2,7 @@
 
 #include <cstring>
 #include <limits>
+#include <vector>
 
 #include "font.hpp"
 #include "layer.hpp"
@@ -13,6 +14,9 @@
 #include "timer.hpp"
 #include "keyboard.hpp"
 #include "logger.hpp"
+#include "uefi.hpp"
+#include "usb/classdriver/cdc.hpp"
+#include "usb/xhci/xhci.hpp"
 
 namespace {
 
@@ -93,7 +97,8 @@ WithError<uint64_t> CopyLoadSegments(Elf64_Ehdr* ehdr) {
     LinearAddress4Level dest_addr;
     dest_addr.value = phdr[i].p_vaddr;
     last_addr = std::max(last_addr, phdr[i].p_vaddr + phdr[i].p_memsz);
-    const auto num_4kpages = (phdr[i].p_memsz + 4095) / 4096;
+    const auto num_4kpages =
+      ((phdr[i].p_vaddr & 4095) + phdr[i].p_memsz + 4095) / 4096;
 
     // setup pagemaps as readonly (writable = false)
     if (auto err = SetupPageMaps(dest_addr, num_4kpages, false)) {
@@ -506,6 +511,64 @@ void Terminal::ExecuteLine() {
     PrintToFD(*files_[1], "Phys total: %lu frames (%llu MiB)\n",
         p_stat.total_frames,
         p_stat.total_frames * kBytesPerFrame / 1024 / 1024);
+  } else if (strcmp(command, "date") == 0) {
+    EFI_TIME t;
+    uefi_rt->GetTime(&t, nullptr);
+    if (t.TimeZone == EFI_UNSPECIFIED_TIMEZONE) {
+      PrintToFD(*files_[1], "%d-%02d-%02d %02d:%02d:%02d\n",
+          t.Year, t.Month, t.Day, t.Hour, t.Minute, t.Second);
+    } else {
+      PrintToFD(*files_[1], "%d-%02d-%02d %02d:%02d:%02d ",
+          t.Year, t.Month, t.Day, t.Hour, t.Minute, t.Second);
+      if (t.TimeZone >= 0) {
+        PrintToFD(*files_[1], "+%02d%02d\n", t.TimeZone / 60, t.TimeZone % 60);
+      } else {
+        PrintToFD(*files_[1], "-%02d%02d\n", -t.TimeZone / 60, -t.TimeZone % 60);
+      }
+    }
+  } else if (strcmp(command, "reboot") == 0) {
+    uefi_rt->ResetSystem(EfiResetWarm, EFI_SUCCESS, 0, nullptr);
+  } else if (strcmp(command, "poweroff") == 0) {
+    uefi_rt->ResetSystem(EfiResetShutdown, EFI_SUCCESS, 0, nullptr);
+  } else if (strcmp(command, "lsusb") == 0) {
+    auto devmgr = usb::xhci::controller->DeviceManager();
+    for (int slot = 1; slot < 256; ++slot) {
+      auto dev = devmgr->FindBySlot(slot);
+      if (!dev) {
+        continue;
+      }
+      PrintToFD(*files_[1], "Slot %d: ID %04x:%04x Class %d.%d.%d\n",
+                slot,
+                dev->DeviceDesc().vendor_id,
+                dev->DeviceDesc().product_id,
+                dev->DeviceDesc().device_class,
+                dev->DeviceDesc().device_sub_class,
+                dev->DeviceDesc().device_protocol);
+    }
+  } else if (strcmp(command, "usbtest") == 0) {
+    [&]{
+      if (!usb::cdc::driver) {
+        PrintToFD(*files_[2], "CDC device not exist\n");
+        exit_code = 1;
+        return;
+      }
+
+      size_t send_len;
+      if (first_arg && first_arg[0]) {
+        send_len = strlen(first_arg);
+        usb::cdc::driver->SendSerial(first_arg, send_len);
+      } else {
+        send_len = 1;
+        usb::cdc::driver->SendSerial("a", 1);
+      }
+
+      std::vector<uint8_t> buf(send_len);
+      int recv_len = usb::cdc::driver->ReceiveSerial(buf.data(), send_len);
+      while (recv_len == 0) {
+        recv_len = usb::cdc::driver->ReceiveSerial(buf.data(), send_len);
+      }
+      PrintToFD(*files_[1], "%.*s\n", recv_len, buf.data());
+    }();
   } else if (command[0] != 0) {
     auto file_entry = FindCommand(command);
     if (!file_entry) {
@@ -555,8 +618,8 @@ WithError<int> Terminal::ExecuteFile(fat::DirectoryEntry& file_entry,
   }
   auto argv = reinterpret_cast<char**>(args_frame_addr.value);
   int argv_len = 32; // argv = 8x32 = 256 bytes
-  auto argbuf = reinterpret_cast<char*>(args_frame_addr.value + sizeof(char**) * argv_len);
-  int argbuf_len = 4096 - sizeof(char**) * argv_len;
+  auto argbuf = reinterpret_cast<char*>(args_frame_addr.value + sizeof(char*) * argv_len);
+  int argbuf_len = 4096 - sizeof(char*) * argv_len;
   auto argc = MakeArgVector(command, first_arg, argv, argv_len, argbuf, argbuf_len);
   if (argc.error) {
     return { 0, argc.error };
