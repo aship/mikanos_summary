@@ -359,7 +359,6 @@ void Terminal::ExecuteLine() {
   char* first_arg = strchr(&linebuf_[0], ' ');
   char* redir_char = strchr(&linebuf_[0], '>');
   char* pipe_char = strchr(&linebuf_[0], '|');
-
   if (first_arg) {
     *first_arg = 0;
     do {
@@ -718,7 +717,6 @@ void TaskTerminal(uint64_t task_id, int64_t data) {
     delete term_desc;
     __asm__("cli");
     task_manager->Finish(terminal->LastExitCode());
-    __asm__("sti");
   }
 
   auto add_blink_timer = [task_id](unsigned long t){
@@ -767,6 +765,11 @@ void TaskTerminal(uint64_t task_id, int64_t data) {
       break;
     case Message::kWindowActive:
       window_isactive = msg->arg.window_active.activate;
+      break;
+    case Message::kWindowClose:
+      CloseLayer(msg->arg.window_close.layer_id);
+      __asm__("cli");
+      task_manager->Finish(terminal->LastExitCode());
       break;
     default:
       break;
