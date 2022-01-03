@@ -91,20 +91,22 @@ extern "C" void KernelMainNewStack(
   layer_manager->Draw({{0, 0}, ScreenSize()});
 
   InitializeLAPICTimer();
-  
+
   char str[128];
-  unsigned int count = 0;
 
   while (true) {
-    ++count;
-    sprintf(str, "%010u", count);
+    __asm__("cli");
+    const auto tick = timer_manager->CurrentTick();
+    __asm__("sti");
+
+    sprintf(str, "%010lu", tick);
     FillRectangle(*main_window->Writer(), {24, 28}, {8 * 10, 16}, {0xc6, 0xc6, 0xc6});
     WriteString(*main_window->Writer(), {24, 28}, str, {0, 0, 0});
     layer_manager->Draw(main_window_layer_id);
 
     __asm__("cli");
     if (main_queue->size() == 0) {
-      __asm__("sti");
+      __asm__("sti\n\thlt");
       continue;
     }
 
@@ -112,7 +114,6 @@ extern "C" void KernelMainNewStack(
     main_queue->pop_front();
     __asm__("sti");
 
-    // #@@range_begin(process_event)
     switch (msg.type) {
     case Message::kInterruptXHCI:
       usb::xhci::ProcessEvents();
@@ -120,7 +121,6 @@ extern "C" void KernelMainNewStack(
     case Message::kInterruptLAPICTimer:
       printk("Timer interrupt\n");
       break;
-    // #@@range_end(process_event)
     default:
       Log(kError, "Unknown message type: %d\n", msg.type);
     }
