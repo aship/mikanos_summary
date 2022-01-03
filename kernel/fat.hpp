@@ -200,4 +200,5 @@ class FileDescriptor : public ::FileDescriptor {
   unsigned long wr_cluster_ = 0;
   size_t wr_cluster_off_ = 0;
 };
+
 } // namespace fat

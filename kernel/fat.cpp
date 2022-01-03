@@ -339,4 +339,5 @@ size_t FileDescriptor::Write(const void* buf, size_t len) {
   fat_entry_.file_size = wr_off_;
   return total;
 }
+
 } // namespace fat
