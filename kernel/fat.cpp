@@ -86,4 +86,5 @@ bool NameIsEqual(const DirectoryEntry& entry, const char* name) {
 
   return memcmp(entry.name, name83, sizeof(name83)) == 0;
 }
+
 } // namespace fat
