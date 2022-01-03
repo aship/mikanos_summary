@@ -152,4 +152,5 @@ class FileDescriptor {
   unsigned long rd_cluster_ = 0;
   size_t rd_cluster_off_ = 0;
 };
+
 } // namespace fat

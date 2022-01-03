@@ -183,4 +183,5 @@ size_t FileDescriptor::Read(void* buf, size_t len) {
   rd_off_ += total;
   return total;
 }
+
 } // namespace fat
