@@ -231,6 +231,7 @@ fat::DirectoryEntry* FindCommand(const char* command,
   }
   return FindCommand(command, apps_entry.first->FirstCluster());
 }
+
 } // namespace
 
 std::map<fat::DirectoryEntry*, AppLoadInfo>* app_loads;
@@ -358,7 +359,6 @@ void Terminal::ExecuteLine() {
   char* first_arg = strchr(&linebuf_[0], ' ');
   char* redir_char = strchr(&linebuf_[0], '>');
   char* pipe_char = strchr(&linebuf_[0], '|');
-
   if (first_arg) {
     *first_arg = 0;
     ++first_arg;
@@ -395,6 +395,7 @@ void Terminal::ExecuteLine() {
 
   if (pipe_char) {
     *pipe_char = 0;
+
     char* subcommand = &pipe_char[1];
     while (isspace(*subcommand)) {
       ++subcommand;
@@ -412,6 +413,7 @@ void Terminal::ExecuteLine() {
       .InitContext(TaskTerminal, reinterpret_cast<int64_t>(term_desc))
       .Wakeup()
       .ID();
+    (*layer_task_map)[layer_id_] = subtask_id;
   }
 
   if (strcmp(command, "echo") == 0) {
@@ -516,6 +518,7 @@ void Terminal::ExecuteLine() {
     pipe_fd->FinishWrite();
     __asm__("cli");
     auto [ ec, err ] = task_manager->WaitFinish(subtask_id);
+    (*layer_task_map)[layer_id_] = task_.ID();
     __asm__("sti");
     if (err) {
       Log(kWarn, "failed to wait finish: %s\n", err.Name());
