@@ -108,4 +108,5 @@ size_t LoadFile(void* buf, size_t len, const DirectoryEntry& entry) {
   }
   return p - buf_uint8;
 }
+
 } // namespace fat

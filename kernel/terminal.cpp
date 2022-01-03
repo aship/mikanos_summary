@@ -200,6 +200,7 @@ Error CleanPageMaps(LinearAddress4Level addr) {
   const FrameID pdp_frame{pdp_addr / kBytesPerFrame};
   return memory_manager->Free(pdp_frame, 1);
 }
+
 } // namespace
 
 Terminal::Terminal() {
