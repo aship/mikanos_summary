@@ -100,7 +100,6 @@ Error CleanPageMap(
     PageMapEntry* page_map, int page_map_level, LinearAddress4Level addr) {
   for (int i = addr.Part(page_map_level); i < 512; ++i) {
     auto entry = page_map[i];
-
     if (!entry.bits.present) {
       continue;
     }
@@ -172,6 +171,7 @@ Error CopyOnePage(uint64_t causal_addr) {
   return SetPageContent(reinterpret_cast<PageMapEntry*>(GetCR3()), 4,
                         LinearAddress4Level{causal_addr}, p);
 }
+
 } // namespace
 
 WithError<PageMapEntry*> NewPageMap() {
@@ -200,7 +200,6 @@ Error CleanPageMaps(LinearAddress4Level addr) {
   return CleanPageMap(pml4_table, 4, addr);
 }
 
-// #@@range_begin(copy_page_maps)
 Error CopyPageMaps(PageMapEntry* dest, PageMapEntry* src, int part, int start) {
   if (part == 1) {
     for (int i = start; i < 512; ++i) {
