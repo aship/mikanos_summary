@@ -40,6 +40,7 @@ Error RenderUnicode(char32_t c, FT_Face face) {
   }
   return MAKE_ERROR(Error::kSuccess);
 }
+
 } // namespace
 
 void WriteAscii(PixelWriter& writer, Vector2D<int> pos, char c, const PixelColor& color) {
